@@ -395,10 +395,10 @@ void ompl_interface::ModelBasedPlanningContext::useConfig()
 
 
   // check whether the path returned by the planner should be interpolated
-  it = cfg.find("simplify_solution");
+  it = cfg.find("simplify_solutions");
   if (it != cfg.end())
   {
-    simplify_solution_ = boost::lexical_cast<bool>(it->second);
+    simplify_solutions_ = boost::lexical_cast<bool>(it->second);
     cfg.erase(it);
   }
 
