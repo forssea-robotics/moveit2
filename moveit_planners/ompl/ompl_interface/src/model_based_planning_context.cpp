@@ -389,7 +389,8 @@ void ompl_interface::ModelBasedPlanningContext::useConfig()
   it = cfg.find("interpolate");
   if (it != cfg.end())
   {
-    interpolate_ = boost::lexical_cast<bool>(it->second);
+//    interpolate_ = boost::lexical_cast<bool>(it->second);
+    if (it->second == "false") interpolate_ = false;
     cfg.erase(it);
   }
 
@@ -398,7 +399,8 @@ void ompl_interface::ModelBasedPlanningContext::useConfig()
   it = cfg.find("simplify_solutions");
   if (it != cfg.end())
   {
-    simplify_solutions_ = boost::lexical_cast<bool>(it->second);
+//    simplify_solutions_ = boost::lexical_cast<bool>(it->second);
+    if (it->second == "false") simplify_solutions_ = false;
     cfg.erase(it);
   }
 
