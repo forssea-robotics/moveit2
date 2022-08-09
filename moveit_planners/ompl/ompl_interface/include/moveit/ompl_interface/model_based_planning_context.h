@@ -47,6 +47,9 @@
 #include <ompl/base/StateStorage.h>
 #include <ompl/base/spaces/constraint/ConstrainedStateSpace.h>
 
+#include <moveit/ompl_interface/ompl_optimization_objective_loader.h>
+#include <pluginlib/class_loader.hpp>
+
 namespace ompl_interface
 {
 namespace ob = ompl::base;
@@ -388,6 +391,10 @@ protected:
   void registerTerminationCondition(const ob::PlannerTerminationCondition& ptc);
   void unregisterTerminationCondition();
 
+  /** \brief Construct the map with all the declared optimization objective plugin
+   */
+  void constructOptimizationObjectives();
+
   ModelBasedPlanningContextSpecification spec_;
 
   moveit::core::RobotState complete_initial_robot_state_;
@@ -410,7 +417,7 @@ protected:
   const ob::PlannerTerminationCondition* ptc_;
   std::mutex ptc_lock_;
 
-  /// the time spent computing the last plan
+    /// the time spent computing the last plan
   double last_plan_time_;
 
   /// the time spent simplifying the last plan
@@ -450,5 +457,11 @@ protected:
 
   // if false parallel plan returns the first solution found
   bool hybridize_;
+
+  /// loader for the declared optimization objective plugin
+  pluginlib::ClassLoader<ompl_optimization_loader::OptimizationObjectiveLoader> optimization_objective_loader_;
+
+  /// map of all the optimization objectives plugins
+  std::map<std::string, std::shared_ptr<ompl_optimization_loader::OptimizationObjectiveLoader>> optimization_objectives_;
 };
 }  // namespace ompl_interface

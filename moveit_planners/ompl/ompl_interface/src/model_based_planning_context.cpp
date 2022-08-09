@@ -65,9 +65,6 @@
 #include "ompl/base/objectives/MaximizeMinClearanceObjective.h"
 #include <ompl/geometric/planners/prm/LazyPRM.h>
 
-#include <moveit/ompl_interface/ompl_optimization_objective_loader.h>
-#include <pluginlib/class_loader.hpp>
-
 
 namespace ompl_interface
 {
@@ -95,11 +92,14 @@ ompl_interface::ModelBasedPlanningContext::ModelBasedPlanningContext(const std::
   , simplify_solutions_(true)
   , interpolate_(true)
   , hybridize_(true)
-{
+  , optimization_objective_loader_(pluginlib::ClassLoader<ompl_optimization_loader::OptimizationObjectiveLoader>("moveit_core", "ompl_optimization_loader::OptimizationObjectiveLoader"))
+  {
   complete_initial_robot_state_.setToDefaultValues();  // avoid uninitialized memory
   complete_initial_robot_state_.update();
 
   constraints_library_ = std::make_shared<ConstraintsLibrary>(this);
+
+  constructOptimizationObjectives();
 }
 
 void ompl_interface::ModelBasedPlanningContext::configure(const rclcpp::Node::SharedPtr& node,
@@ -351,27 +351,17 @@ void ompl_interface::ModelBasedPlanningContext::useConfig()
       objective =
           std::make_shared<ompl::base::MaximizeMinClearanceObjective>(ompl_simple_setup_->getSpaceInformation());
     }
+    else if (optimization_objectives_.find(optimizer) != optimization_objectives_.end())
+    {
+      objective = optimization_objectives_[optimizer]->getOptimizationObjective(ompl_simple_setup_->getSpaceInformation());
+    }
     else
     {
-        pluginlib::ClassLoader<ompl_optimization_loader::OptimizationObjectiveLoader> poly_loader("moveit_core", "ompl_optimization_loader::OptimizationObjectiveLoader");
+      RCLCPP_ERROR(LOGGER, "Unknown optimization objective for OMPL planner");
+      RCLCPP_ERROR(LOGGER, "Fall back to the default optimizer : PathLengthOptimizationObjective");
 
-        try
-        {
-            RCLCPP_DEBUG(LOGGER, "Using optimization objective : %s", optimizer.c_str());
-            std::shared_ptr<ompl_optimization_loader::OptimizationObjectiveLoader> obj = poly_loader.createSharedInstance(optimizer);
-
-            objective = obj->getOptimizationObjective(ompl_simple_setup_->getSpaceInformation());
-
-        }
-        catch(pluginlib::PluginlibException& ex)
-        {
-            RCLCPP_ERROR(LOGGER, "The plugin failed to load for some reason. Error: %s",  ex.what());
-            RCLCPP_ERROR(LOGGER, "Fall back to the default optimizer");
-
-            objective =
-                    std::make_shared<ompl::base::PathLengthOptimizationObjective>(ompl_simple_setup_->getSpaceInformation());
-
-        }
+      objective =
+              std::make_shared<ompl::base::PathLengthOptimizationObjective>(ompl_simple_setup_->getSpaceInformation());
 
     }
 
@@ -391,6 +381,7 @@ void ompl_interface::ModelBasedPlanningContext::useConfig()
   {
 //    interpolate_ = boost::lexical_cast<bool>(it->second);
     if (it->second == "false") interpolate_ = false;
+    else interpolate_ = true;
     cfg.erase(it);
   }
 
@@ -401,6 +392,7 @@ void ompl_interface::ModelBasedPlanningContext::useConfig()
   {
 //    simplify_solutions_ = boost::lexical_cast<bool>(it->second);
     if (it->second == "false") simplify_solutions_ = false;
+    else simplify_solutions_ = true;
     cfg.erase(it);
   }
 
@@ -1016,4 +1008,22 @@ bool ompl_interface::ModelBasedPlanningContext::loadConstraintApproximations(con
     return true;
   }
   return false;
+}
+
+void ompl_interface::ModelBasedPlanningContext::constructOptimizationObjectives()
+{
+  for (const auto& plugin_name : optimization_objective_loader_.getDeclaredClasses())
+  {
+    try
+    {
+      RCLCPP_DEBUG(LOGGER, "Loading optimization objective : %s", plugin_name.c_str());
+      std::shared_ptr<ompl_optimization_loader::OptimizationObjectiveLoader> obj_loader = optimization_objective_loader_.createSharedInstance(plugin_name);
+
+      optimization_objectives_[plugin_name] = obj_loader;
+    }
+    catch(pluginlib::PluginlibException& ex)
+    {
+      RCLCPP_ERROR(LOGGER, "The plugin %s failed to load for some reason. Error: %s", plugin_name.c_str(), ex.what());
+    }
+  }
 }
